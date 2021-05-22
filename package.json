@@ -1,0 +1,22 @@
+{
+  "name": "sec-rps",
+  "version": "0.0.1",
+  "description": "A rock-papers-scissors implementation on Solidity for the Security course at Universidad Austral",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/ropa1998/sec-rps.git"
+  },
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/ropa1998/sec-rps/issues"
+  },
+  "homepage": "https://github.com/ropa1998/sec-rps#readme",
+  "devDependencies": {
+    "truffle": "^5.3.7"
+  }
+}
