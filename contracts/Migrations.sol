@@ -1,29 +1,19 @@
+// SPDX-License-Identifier: MIT
 pragma solidity >=0.4.22 <0.9.0;
 
-contract rps {
+contract Migrations {
+    address public owner = msg.sender;
+    uint public last_completed_migration;
 
-    uint public BET_MIN = 1 wei;
-
-    enum Moves {None, Rock, Paper, Scissors}
-    enum Outcomes {None, Player1, Player2, Draw}
-
-    OpenMatch[] openMatches;
-
-    modifier validBet() {
-        require(msg.value >= BET_MIN);
+    modifier restricted() {
+        require(
+            msg.sender == owner,
+            "This function is restricted to the contract's owner"
+        );
         _;
     }
 
-    function register() public payable validBet returns (uint) {
-        OpenMatch memory openMatch = OpenMatch({player1: msg.sender, bet: msg.value});
-        openMatches.push(openMatch);
-        return 1;
+    function setCompleted(uint completed) public restricted {
+        last_completed_migration = completed;
     }
-
-    struct OpenMatch {
-        address player1;
-        uint bet;
-    }
-
-
 }
