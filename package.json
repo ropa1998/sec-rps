@@ -18,5 +18,8 @@
   "homepage": "https://github.com/ropa1998/sec-rps#readme",
   "devDependencies": {
     "truffle": "^5.3.7"
+  },
+  "dependencies": {
+    "@openzeppelin/contracts": "^4.1.0"
   }
 }

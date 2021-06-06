@@ -18,6 +18,10 @@ structure.
 - A match must be cancelable by player 1 (the creating player)
 - After a user made its play then the other player has a timeout to make the play
 
+We **MUST** use [OpenZeppelin](https://docs.openzeppelin.com/contracts/4.x/) to get
+both [Ownable](https://docs.openzeppelin.com/contracts/4.x/access-control#ownership-and-ownable)
+and [SafeMath](https://docs.openzeppelin.com/contracts/4.x/utilities#api:math.adoc%23SafeMath)
+
 ## Useful links
 
 - [Solidity basic structures and types](https://cryptozombies.io/es/lesson/1/chapter/2)
