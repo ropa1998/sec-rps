@@ -35,7 +35,7 @@ contract rps {
     function register() public payable validBet returns (uint) {
         if (betToOpenMatch[msg.value].bet != 0){
             OpenMatch memory openMatch = betToOpenMatch[msg.value];
-            ReadyMatch memory readyMatch = ReadyMatch(openMatch.player1, msg.sender, msg.value, Outcomes.None, Moves.None, Moves.None);
+            ReadyMatch memory readyMatch = ReadyMatch(openMatch.player1, payable(msg.sender), msg.value, Outcomes.None, Moves.None, Moves.None);
             idToReadyMatch[counter] = readyMatch;
             emit MatchIsReady(counter, readyMatch.player1, readyMatch.player2);
             counter++;
@@ -43,7 +43,7 @@ contract rps {
             return counter - 1;
         }
         else {
-            OpenMatch memory openMatch = OpenMatch(msg.sender, msg.value);
+            OpenMatch memory openMatch = OpenMatch(payable(msg.sender), msg.value);
             betToOpenMatch[msg.value] = openMatch;
             return 0;
         }
@@ -79,7 +79,7 @@ contract rps {
         emit Result(outcome, readyMatch.player1, readyMatch.player2);
     }
 
-    function _getOutcome(ReadyMatch memory _match) private isMatchFinished(_match) returns (Outcomes) {
+    function _getOutcome(ReadyMatch memory _match) private isMatchFinished(_match) view returns (Outcomes) {
         return resultHandler[_match.player1Move][_match.player2Move];
     }
 
