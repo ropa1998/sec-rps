@@ -64,7 +64,7 @@ contract rps {
     }
 
     function move(Moves _move, uint _readyMatchId) public {
-        ReadyMatch storage readyMatch = idToReadyMatch[_readyMatchId];
+        ReadyMatch memory readyMatch = idToReadyMatch[_readyMatchId];
         require(msg.sender == readyMatch.player1 || msg.sender == readyMatch.player2);
         if (msg.sender == readyMatch.player1) {
             require(readyMatch.player1Move == Moves.None);
@@ -76,16 +76,19 @@ contract rps {
         }
         Outcomes outcome = _getOutcome(readyMatch);
         readyMatch.outcome = outcome;
+        idToReadyMatch[_readyMatchId] = readyMatch;
         emit Result(outcome, readyMatch.player1, readyMatch.player2);
     }
 
-    function _getOutcome(ReadyMatch memory _match) private isMatchFinished(_match) view returns (Outcomes) {
-        return resultHandler[_match.player1Move][_match.player2Move];
+    function _getOutcome(ReadyMatch memory _match) private view returns (Outcomes) {
+        if (_isMatchFinished(_match)){
+            return resultHandler[_match.player1Move][_match.player2Move];
+        }
+        return Outcomes.None;
     }
 
-    modifier isMatchFinished(ReadyMatch memory _match) {
-        require(_match.player1Move != Moves.None && _match.player2Move != Moves.None);
-        _;
+    function _isMatchFinished(ReadyMatch memory _match) private pure returns (bool) {
+        return (_match.player1Move != Moves.None && _match.player2Move != Moves.None);
     }
 
     function _handleOutcome(ReadyMatch memory _match) private {
