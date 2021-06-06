@@ -7,22 +7,36 @@ contract rps {
 
     enum Moves {None, Rock, Paper, Scissors}
     enum Outcomes {None, Player1, Player2, Draw}
+    mapping(uint => OpenMatch) betToOpenMatch;
 
-    OpenMatch[] openMatches;
+    ReadyMatch[] readyMatches;
 
     modifier validBet() {
         require(msg.value >= BET_MIN);
         _;
     }
 
-    function register() public payable validBet returns (uint) {
-        OpenMatch memory openMatch = OpenMatch({player1: msg.sender, bet: msg.value});
-        openMatches.push(openMatch);
-        return 1;
+    function register() public payable validBet {
+        if (betToOpenMatch[msg.value].bet != 0){
+            OpenMatch memory openMatch = betToOpenMatch[msg.value];
+            ReadyMatch memory readyMatch = ReadyMatch(openMatch.player1, msg.sender, msg.value);
+            readyMatches.push(readyMatch);
+            delete betToOpenMatch[msg.value];
+        }
+        else {
+            OpenMatch memory openMatch = OpenMatch({player1: msg.sender, bet: msg.value});
+            betToOpenMatch[msg.value] = openMatch;
+        }
     }
 
     struct OpenMatch {
         address player1;
+        uint bet;
+    }
+
+    struct ReadyMatch {
+        address player1;
+        address player2;
         uint bet;
     }
 
