@@ -5,17 +5,21 @@ contract rps {
 
     uint public BET_MIN = 1 wei;
     uint counter = 1;
+    uint SECOND_PLAY_TIMEOUT = 1 minutes;
+    uint FIRST_PLAY_TIMEOUT = 1 days;
 
     enum Moves {None, Rock, Paper, Scissors}
     enum Outcomes {None, Player1, Player2, Draw}
+    mapping(Moves => mapping(Moves => Outcomes)) resultHandler;
+
     mapping(uint => OpenMatch) betToOpenMatch;
     mapping(uint => ReadyMatch) idToReadyMatch;
-    mapping(Moves => mapping(Moves => Outcomes)) resultHandler;
 
     event MatchIsReady(uint readyMatchId, address payable player1, address payable player2);
     event Result(Outcomes outcome, address payable player1, address payable player2);
     event OpenedMatch(OpenMatch openMatch);
-    event CanceledMatch(uint value);
+    event OpenMatchCanceled(uint value);
+    event ReadyMatchCanceled(ReadyMatch readyMatch);
 
     constructor() {
         resultHandler[Moves.Rock][Moves.Rock] = Outcomes.Draw;
@@ -41,9 +45,9 @@ contract rps {
 
 
     function register() public payable validBet {
-        if (betToOpenMatch[msg.value].bet != 0){
+        if (betToOpenMatch[msg.value].bet != 0) {
             OpenMatch memory openMatch = betToOpenMatch[msg.value];
-            ReadyMatch memory readyMatch = ReadyMatch(openMatch.player1, payable(msg.sender), msg.value, Outcomes.None, Moves.None, Moves.None);
+            ReadyMatch memory readyMatch = ReadyMatch(openMatch.player1, payable(msg.sender), msg.value, Outcomes.None, Moves.None, Moves.None, block.timestamp + FIRST_PLAY_TIMEOUT);
             idToReadyMatch[counter] = readyMatch;
             emit MatchIsReady(counter, readyMatch.player1, readyMatch.player2);
             counter++;
@@ -56,11 +60,11 @@ contract rps {
         }
     }
 
-    function cancel(uint _value) public isGameOwner(_value){
+    function cancel(uint _value) public isGameOwner(_value) {
         OpenMatch memory om = betToOpenMatch[_value];
         om.player1.transfer(om.bet);
         delete betToOpenMatch[_value];
-        emit CanceledMatch(_value);
+        emit OpenMatchCanceled(_value);
     }
 
     struct OpenMatch {
@@ -75,11 +79,17 @@ contract rps {
         Outcomes outcome;
         Moves player1Move;
         Moves player2Move;
+        uint timeout;
     }
 
     function move(Moves _move, uint _readyMatchId) public {
         ReadyMatch memory readyMatch = idToReadyMatch[_readyMatchId];
         require(msg.sender == readyMatch.player1 || msg.sender == readyMatch.player2);
+        if (!timeoutValid(readyMatch)) {
+            cancelMatch(readyMatch, _readyMatchId);
+            emit ReadyMatchCanceled(readyMatch);
+            return;
+        }
         if (msg.sender == readyMatch.player1) {
             require(readyMatch.player1Move == Moves.None);
             readyMatch.player1Move = _move;
@@ -88,6 +98,7 @@ contract rps {
             require(readyMatch.player2Move == Moves.None);
             readyMatch.player2Move = _move;
         }
+        readyMatch.timeout = block.timestamp + SECOND_PLAY_TIMEOUT;
         Outcomes outcome = _getOutcome(readyMatch);
         readyMatch.outcome = outcome;
         idToReadyMatch[_readyMatchId] = readyMatch;
@@ -95,7 +106,7 @@ contract rps {
     }
 
     function _getOutcome(ReadyMatch memory _match) private view returns (Outcomes) {
-        if (_isMatchFinished(_match)){
+        if (_isMatchFinished(_match)) {
             return resultHandler[_match.player1Move][_match.player2Move];
         }
         return Outcomes.None;
@@ -114,5 +125,14 @@ contract rps {
         }
     }
 
+    function timeoutValid(ReadyMatch memory readyMatch) view private returns (bool){
+        return block.timestamp <= readyMatch.timeout;
+    }
+
+    function cancelMatch(ReadyMatch memory readyMatch, uint matchId) private {
+        readyMatch.player1.transfer(readyMatch.bet);
+        readyMatch.player2.transfer(readyMatch.bet);
+        delete idToReadyMatch[matchId];
+    }
 
 }
