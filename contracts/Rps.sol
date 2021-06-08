@@ -14,6 +14,8 @@ contract rps {
 
     event MatchIsReady(uint readyMatchId, address payable player1, address payable player2);
     event Result(Outcomes outcome, address payable player1, address payable player2);
+    event OpenedMatch(OpenMatch openMatch);
+    event CanceledMatch(uint value);
 
     constructor() {
         resultHandler[Moves.Rock][Moves.Rock] = Outcomes.Draw;
@@ -32,7 +34,13 @@ contract rps {
         _;
     }
 
-    function register() public payable validBet returns (uint) {
+    modifier isGameOwner(uint _value) {
+        require(betToOpenMatch[_value].player1 == payable(msg.sender));
+        _;
+    }
+
+
+    function register() public payable validBet {
         if (betToOpenMatch[msg.value].bet != 0){
             OpenMatch memory openMatch = betToOpenMatch[msg.value];
             ReadyMatch memory readyMatch = ReadyMatch(openMatch.player1, payable(msg.sender), msg.value, Outcomes.None, Moves.None, Moves.None);
@@ -40,13 +48,19 @@ contract rps {
             emit MatchIsReady(counter, readyMatch.player1, readyMatch.player2);
             counter++;
             delete betToOpenMatch[msg.value];
-            return counter - 1;
         }
         else {
             OpenMatch memory openMatch = OpenMatch(payable(msg.sender), msg.value);
             betToOpenMatch[msg.value] = openMatch;
-            return 0;
+            emit OpenedMatch(openMatch);
         }
+    }
+
+    function cancel(uint _value) public isGameOwner(_value){
+        OpenMatch memory om = betToOpenMatch[_value];
+        om.player1.transfer(om.bet);
+        delete betToOpenMatch[_value];
+        emit CanceledMatch(_value);
     }
 
     struct OpenMatch {
