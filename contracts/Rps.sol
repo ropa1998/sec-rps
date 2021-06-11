@@ -1,37 +1,18 @@
 // SPDX-License-Identifier: MIT
 pragma solidity >=0.4.22 <0.9.0;
 
-contract rps {
+contract RPSFactory {
 
     uint public BET_MIN = 1 wei;
-    uint counter = 1;
     uint SECOND_PLAY_TIMEOUT = 1 minutes;
-    uint FIRST_PLAY_TIMEOUT = 1 days;
-
-    enum Moves {None, Rock, Paper, Scissors}
-    enum Outcomes {None, Player1, Player2, Draw}
-    mapping(Moves => mapping(Moves => Outcomes)) resultHandler;
+    uint FIRST_PLAY_TIMEOUT = 1 hours;
 
     mapping(uint => OpenMatch) betToOpenMatch;
-    mapping(uint => ReadyMatch) idToReadyMatch;
+    RPSGame[] public matches;
 
-    event MatchIsReady(uint readyMatchId, address payable player1, address payable player2);
-    event Result(Outcomes outcome, address payable player1, address payable player2);
     event OpenedMatch(OpenMatch openMatch);
     event OpenMatchCanceled(uint value);
-    event ReadyMatchCanceled(ReadyMatch readyMatch);
-
-    constructor() {
-        resultHandler[Moves.Rock][Moves.Rock] = Outcomes.Draw;
-        resultHandler[Moves.Rock][Moves.Paper] = Outcomes.Player2;
-        resultHandler[Moves.Rock][Moves.Scissors] = Outcomes.Player1;
-        resultHandler[Moves.Paper][Moves.Rock] = Outcomes.Player1;
-        resultHandler[Moves.Paper][Moves.Paper] = Outcomes.Draw;
-        resultHandler[Moves.Paper][Moves.Scissors] = Outcomes.Player2;
-        resultHandler[Moves.Scissors][Moves.Rock] = Outcomes.Player2;
-        resultHandler[Moves.Scissors][Moves.Paper] = Outcomes.Player1;
-        resultHandler[Moves.Scissors][Moves.Scissors] = Outcomes.Draw;
-    }
+    event MatchCreated(uint index, address game);
 
     modifier validBet() {
         require(msg.value >= BET_MIN);
@@ -43,14 +24,13 @@ contract rps {
         _;
     }
 
-
     function register() public payable validBet {
         if (betToOpenMatch[msg.value].bet != 0) {
             OpenMatch memory openMatch = betToOpenMatch[msg.value];
-            ReadyMatch memory readyMatch = ReadyMatch(openMatch.player1, payable(msg.sender), msg.value, Outcomes.None, Moves.None, Moves.None, block.timestamp + FIRST_PLAY_TIMEOUT);
-            idToReadyMatch[counter] = readyMatch;
-            emit MatchIsReady(counter, readyMatch.player1, readyMatch.player2);
-            counter++;
+            uint index = matches.length;
+            RPSGame newGame = new RPSGame(index, openMatch.player1, payable(msg.sender), block.timestamp + FIRST_PLAY_TIMEOUT, SECOND_PLAY_TIMEOUT, msg.value);
+            matches.push(newGame);
+            emit MatchCreated(index, address(newGame));
             delete betToOpenMatch[msg.value];
         }
         else {
@@ -72,67 +52,118 @@ contract rps {
         uint bet;
     }
 
-    struct ReadyMatch {
-        address payable player1;
-        address payable player2;
-        uint bet;
-        Outcomes outcome;
-        Moves player1Move;
-        Moves player2Move;
-        uint timeout;
+}
+
+contract RPSGame {
+
+    uint public index;
+
+    enum GameStatus {Active, Canceled, Finished}
+    enum Moves {None, Rock, Paper, Scissors}
+    enum Outcomes {None, Player1, Player2, Draw}
+    mapping(Moves => mapping(Moves => Outcomes)) resultHandler;
+
+    address payable player1;
+    address payable player2;
+    uint bet;
+    Outcomes outcome;
+    Moves player1Move;
+    Moves player2Move;
+    uint afterPlayTimeout;
+    uint currentTimeout;
+    GameStatus status;
+
+    event Result(Outcomes outcome, address payable player1, address payable player2);
+    event CanceledMatch();
+
+    modifier isPlayer() {
+        require(msg.sender == player1 || msg.sender == player2);
+        _;
     }
 
-    function move(Moves _move, uint _readyMatchId) public {
-        ReadyMatch memory readyMatch = idToReadyMatch[_readyMatchId];
-        require(msg.sender == readyMatch.player1 || msg.sender == readyMatch.player2);
-        if (!timeoutValid(readyMatch)) {
-            cancelMatch(readyMatch, _readyMatchId);
-            emit ReadyMatchCanceled(readyMatch);
+    modifier isActive() {
+        require(status != GameStatus.Canceled);
+        _;
+    }
+
+    constructor(uint _index, address payable _player1, address payable _player2, uint _initialTimeout, uint _afterPlayTimeout, uint _bet){
+        index = _index;
+        player1 = _player1;
+        player1 = _player2;
+        currentTimeout = _initialTimeout;
+        afterPlayTimeout = _afterPlayTimeout;
+        bet = _bet;
+        outcome = Outcomes.None;
+        player1Move = Moves.None;
+        player2Move = Moves.None;
+        status = GameStatus.Active;
+        createHandler();
+    }
+
+    function createHandler() private {
+        resultHandler[Moves.Rock][Moves.Rock] = Outcomes.Draw;
+        resultHandler[Moves.Rock][Moves.Paper] = Outcomes.Player2;
+        resultHandler[Moves.Rock][Moves.Scissors] = Outcomes.Player1;
+        resultHandler[Moves.Paper][Moves.Rock] = Outcomes.Player1;
+        resultHandler[Moves.Paper][Moves.Paper] = Outcomes.Draw;
+        resultHandler[Moves.Paper][Moves.Scissors] = Outcomes.Player2;
+        resultHandler[Moves.Scissors][Moves.Rock] = Outcomes.Player2;
+        resultHandler[Moves.Scissors][Moves.Paper] = Outcomes.Player1;
+        resultHandler[Moves.Scissors][Moves.Scissors] = Outcomes.Draw;
+    }
+
+    function move(Moves _move) public isPlayer {
+        if (!_timeoutValid()) {
+            _cancelMatch();
             return;
         }
-        if (msg.sender == readyMatch.player1) {
-            require(readyMatch.player1Move == Moves.None);
-            readyMatch.player1Move = _move;
+        if (msg.sender == player1) {
+            require(player1Move == Moves.None);
+            player1Move = _move;
         }
         else {
-            require(readyMatch.player2Move == Moves.None);
-            readyMatch.player2Move = _move;
+            require(player2Move == Moves.None);
+            player2Move = _move;
         }
-        readyMatch.timeout = block.timestamp + SECOND_PLAY_TIMEOUT;
-        Outcomes outcome = _getOutcome(readyMatch);
-        readyMatch.outcome = outcome;
-        idToReadyMatch[_readyMatchId] = readyMatch;
-        emit Result(outcome, readyMatch.player1, readyMatch.player2);
+        currentTimeout = block.timestamp + afterPlayTimeout;
+        outcome = _getOutcome();
+        _handleOutcome();
+        emit Result(outcome, player1, player2);
     }
 
-    function _getOutcome(ReadyMatch memory _match) private view returns (Outcomes) {
-        if (_isMatchFinished(_match)) {
-            return resultHandler[_match.player1Move][_match.player2Move];
+    function _getOutcome() private view returns (Outcomes) {
+        if (_isMatchFinished()) {
+            return resultHandler[player1Move][player2Move];
         }
         return Outcomes.None;
     }
 
-    function _isMatchFinished(ReadyMatch memory _match) private pure returns (bool) {
-        return (_match.player1Move != Moves.None && _match.player2Move != Moves.None);
+    function _isMatchFinished() private view returns (bool) {
+        return (player1Move != Moves.None && player2Move != Moves.None);
     }
 
-    function _handleOutcome(ReadyMatch memory _match) private {
-        if (_match.outcome == Outcomes.Player1) {
-            _match.player1.transfer(_match.bet * 2);
+    function _handleOutcome() private {
+        if (outcome == Outcomes.Player1) {
+            player1.transfer(bet * 2);
         }
-        if (_match.outcome == Outcomes.Player2) {
-            _match.player2.transfer(_match.bet * 2);
+        if (outcome == Outcomes.Player2) {
+            player2.transfer(bet * 2);
         }
+        if (outcome == Outcomes.Draw) {
+            player2.transfer(bet);
+            player1.transfer(bet);
+        }
+        status = GameStatus.Finished;
     }
 
-    function timeoutValid(ReadyMatch memory readyMatch) view private returns (bool){
-        return block.timestamp <= readyMatch.timeout;
+    function _timeoutValid() view private returns (bool){
+        return block.timestamp <= currentTimeout;
     }
 
-    function cancelMatch(ReadyMatch memory readyMatch, uint matchId) private {
-        readyMatch.player1.transfer(readyMatch.bet);
-        readyMatch.player2.transfer(readyMatch.bet);
-        delete idToReadyMatch[matchId];
+    function _cancelMatch() private {
+        player1.transfer(bet);
+        player2.transfer(bet);
+        status = GameStatus.Canceled;
+        emit CanceledMatch();
     }
-
 }
