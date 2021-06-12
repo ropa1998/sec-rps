@@ -14,7 +14,7 @@ contract RPSFactory is Ownable {
 
     bool openForNewGames = true;
 
-    function updateOpenForGames(bool _openForGame) public onlyOwner{
+    function updateOpenForGames(bool _openForGame) public onlyOwner {
         openForNewGames = _openForGame;
     }
 
@@ -88,6 +88,8 @@ contract RPSGame {
     Outcomes outcome;
     Moves player1Move;
     Moves player2Move;
+    bytes32 public player1EncodedMove;
+    bytes32 public player2EncodedMove;
     uint afterPlayTimeout;
     uint currentTimeout;
     GameStatus status;
@@ -96,7 +98,12 @@ contract RPSGame {
     event CanceledMatch();
 
     modifier isPlayer() {
-        require(msg.sender == player1 || msg.sender == player2);
+        require(msg.sender == player1 || msg.sender == player2, "You don't belong in this match");
+        _;
+    }
+
+    modifier bothPlayed() {
+        require(player1EncodedMove.length != 0 && player2EncodedMove.length != 0, "Both players must play before revealing");
         _;
     }
 
@@ -113,8 +120,6 @@ contract RPSGame {
         afterPlayTimeout = _afterPlayTimeout;
         bet = _bet;
         outcome = Outcomes.None;
-        player1Move = Moves.None;
-        player2Move = Moves.None;
         status = GameStatus.Active;
         createHandler();
     }
@@ -135,23 +140,51 @@ contract RPSGame {
 
     receive() external payable {}
 
-    function move(Moves _move) public isPlayer {
+    function move(bytes32 _move) public isPlayer {
         if (!_timeoutValid()) {
             _cancelMatch();
             return;
         }
         if (msg.sender == player1) {
-            require(player1Move == Moves.None);
-            player1Move = _move;
+            require(player1EncodedMove == 0, "You have already played");
+            player1EncodedMove = _move;
         }
         else {
-            require(player2Move == Moves.None);
-            player2Move = _move;
+            require(player2EncodedMove == 0, "You have already played");
+            player2EncodedMove = _move;
         }
         currentTimeout = block.timestamp + afterPlayTimeout;
+    }
+
+    function revealMove(string memory _move, bytes32 _moveCommit) public {
+        require(_moveCommit == keccak256(abi.encodePacked(_move)), "Move is not the committed one");
+        if (payable(msg.sender) == player1) {
+            require(player1EncodedMove == _moveCommit, "Commits are not equal");
+            require(player1Move == Moves.None, "Player has already revealed move");
+            bytes memory decodeMove = bytes(_move);
+            player1Move = _moveToMove(decodeMove);
+        } else {
+            require(player2EncodedMove == _moveCommit, "Commits are not equal");
+            require(player2Move == Moves.None, "Player has already revealed move");
+            bytes memory decodeMove = bytes(_move);
+            player2Move = _moveToMove(decodeMove);
+        }
         outcome = _getOutcome();
         _handleOutcome();
         emit Result(outcome);
+    }
+
+    function _moveToMove(bytes memory _move) private pure returns (Moves){
+        if(_move[0] == 'r'){
+            return Moves.Rock;
+        }
+        if(_move[0] == 'p'){
+            return Moves.Paper;
+        }
+        if(_move[0] == 's'){
+            return Moves.Scissors;
+        }
+        return Moves.None;
     }
 
     function _getOutcome() private view returns (Outcomes) {
