@@ -1,8 +1,11 @@
 // SPDX-License-Identifier: MIT
 pragma solidity >=0.4.22 <0.9.0;
 
-import "https://github.com/OpenZeppelin/openzeppelin-contracts/blob/master/contracts/access/Ownable.sol";
-import "https://github.com/OpenZeppelin/openzeppelin-contracts/blob/master/contracts/utils/math/SafeMath.sol";
+//import "https://github.com/OpenZeppelin/openzeppelin-contracts/blob/master/contracts/access/Ownable.sol";
+//import "https://github.com/OpenZeppelin/openzeppelin-contracts/blob/master/contracts/utils/math/SafeMath.sol";
+
+import "@openzeppelin/contracts/access/Ownable.sol";
+import "@openzeppelin/contracts/utils/math/SafeMath.sol";
 
 contract RPSFactory is Ownable {
 
@@ -12,6 +15,12 @@ contract RPSFactory is Ownable {
     uint SECOND_PLAY_TIMEOUT = 1 minutes;
     uint FIRST_PLAY_TIMEOUT = 1 hours;
 
+    bool openForNewGames = true;
+
+    function updateOpenForGames(bool _openForGame) public onlyOwner{
+        openForNewGames = _openForGame;
+    }
+
     mapping(uint => OpenMatch) betToOpenMatch;
     RPSGame[] public matches;
 
@@ -20,16 +29,23 @@ contract RPSFactory is Ownable {
     event MatchCreated(uint index, address game);
 
     modifier validBet() {
-        require(msg.value >= BET_MIN);
+        require(msg.value >= BET_MIN, "Bet must be at least 1 wei");
+        _;
+    }
+
+    modifier isOpenForGames() {
+        require(openForNewGames, "Factory closed: not creating new games");
         _;
     }
 
     modifier isGameOwner(uint _value) {
-        require(betToOpenMatch[_value].player1 == payable(msg.sender));
+        require(betToOpenMatch[_value].player1 == payable(msg.sender), "User is not the owner of the OpenGame");
         _;
     }
 
-    function register() public payable validBet {
+    constructor() Ownable(){}
+
+    function register() public payable validBet isOpenForGames {
         if (betToOpenMatch[msg.value].bet != 0) {
             OpenMatch memory openMatch = betToOpenMatch[msg.value];
             uint index = matches.length;
