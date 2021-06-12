@@ -29,6 +29,7 @@ contract RPSFactory {
             OpenMatch memory openMatch = betToOpenMatch[msg.value];
             uint index = matches.length;
             RPSGame newGame = new RPSGame(index, openMatch.player1, payable(msg.sender), block.timestamp + FIRST_PLAY_TIMEOUT, SECOND_PLAY_TIMEOUT, msg.value);
+            payable(address(newGame)).transfer(msg.value*2);
             matches.push(newGame);
             emit MatchCreated(index, address(newGame));
             delete betToOpenMatch[msg.value];
@@ -73,7 +74,7 @@ contract RPSGame {
     uint currentTimeout;
     GameStatus status;
 
-    event Result(Outcomes outcome, address payable player1, address payable player2);
+    event Result(Outcomes outcome);
     event CanceledMatch();
 
     modifier isPlayer() {
@@ -89,7 +90,7 @@ contract RPSGame {
     constructor(uint _index, address payable _player1, address payable _player2, uint _initialTimeout, uint _afterPlayTimeout, uint _bet){
         index = _index;
         player1 = _player1;
-        player1 = _player2;
+        player2 = _player2;
         currentTimeout = _initialTimeout;
         afterPlayTimeout = _afterPlayTimeout;
         bet = _bet;
@@ -112,6 +113,10 @@ contract RPSGame {
         resultHandler[Moves.Scissors][Moves.Scissors] = Outcomes.Draw;
     }
 
+    fallback() external payable {}
+
+    receive() external payable {}
+
     function move(Moves _move) public isPlayer {
         if (!_timeoutValid()) {
             _cancelMatch();
@@ -128,7 +133,7 @@ contract RPSGame {
         currentTimeout = block.timestamp + afterPlayTimeout;
         outcome = _getOutcome();
         _handleOutcome();
-        emit Result(outcome, player1, player2);
+        emit Result(outcome);
     }
 
     function _getOutcome() private view returns (Outcomes) {
