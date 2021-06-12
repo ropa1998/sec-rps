@@ -1,7 +1,12 @@
 // SPDX-License-Identifier: MIT
 pragma solidity >=0.4.22 <0.9.0;
 
-contract RPSFactory {
+import "https://github.com/OpenZeppelin/openzeppelin-contracts/blob/master/contracts/access/Ownable.sol";
+import "https://github.com/OpenZeppelin/openzeppelin-contracts/blob/master/contracts/utils/math/SafeMath.sol";
+
+contract RPSFactory is Ownable {
+
+    using SafeMath for uint;
 
     uint public BET_MIN = 1 wei;
     uint SECOND_PLAY_TIMEOUT = 1 minutes;
@@ -29,7 +34,7 @@ contract RPSFactory {
             OpenMatch memory openMatch = betToOpenMatch[msg.value];
             uint index = matches.length;
             RPSGame newGame = new RPSGame(index, openMatch.player1, payable(msg.sender), block.timestamp + FIRST_PLAY_TIMEOUT, SECOND_PLAY_TIMEOUT, msg.value);
-            payable(address(newGame)).transfer(msg.value*2);
+            payable(address(newGame)).transfer(msg.value.add(openMatch.bet));
             matches.push(newGame);
             emit MatchCreated(index, address(newGame));
             delete betToOpenMatch[msg.value];
