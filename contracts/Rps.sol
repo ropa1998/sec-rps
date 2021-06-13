@@ -108,7 +108,7 @@ contract RPSGame {
     }
 
     modifier isActive() {
-        require(status == GameStatus.Canceled);
+        require(status == GameStatus.Active);
         _;
     }
 
@@ -175,13 +175,13 @@ contract RPSGame {
     }
 
     function _moveToMove(bytes memory _move) private pure returns (Moves){
-        if(_move[0] == 'r'){
+        if (_move[0] == 'r') {
             return Moves.Rock;
         }
-        if(_move[0] == 'p'){
+        if (_move[0] == 'p') {
             return Moves.Paper;
         }
-        if(_move[0] == 's'){
+        if (_move[0] == 's') {
             return Moves.Scissors;
         }
         return Moves.None;
@@ -199,17 +199,19 @@ contract RPSGame {
     }
 
     function _handleOutcome() private {
-        if (outcome == Outcomes.Player1) {
-            player1.transfer(bet * 2);
+        if (outcome != Outcomes.None) {
+            if (outcome == Outcomes.Player1) {
+                player1.transfer(bet * 2);
+            }
+            if (outcome == Outcomes.Player2) {
+                player2.transfer(bet * 2);
+            }
+            if (outcome == Outcomes.Draw) {
+                player2.transfer(bet);
+                player1.transfer(bet);
+            }
+            status = GameStatus.Finished;
         }
-        if (outcome == Outcomes.Player2) {
-            player2.transfer(bet * 2);
-        }
-        if (outcome == Outcomes.Draw) {
-            player2.transfer(bet);
-            player1.transfer(bet);
-        }
-        status = GameStatus.Finished;
     }
 
     function _timeoutValid() view private returns (bool){
