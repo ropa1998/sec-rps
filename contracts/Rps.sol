@@ -85,14 +85,14 @@ contract RPSGame {
     address payable player1;
     address payable player2;
     uint bet;
-    Outcomes outcome;
-    Moves player1Move;
-    Moves player2Move;
+    Outcomes public outcome;
+    Moves public player1Move;
+    Moves public player2Move;
     bytes32 public player1EncodedMove;
     bytes32 public player2EncodedMove;
     uint afterPlayTimeout;
     uint currentTimeout;
-    GameStatus status;
+    GameStatus public status;
 
     event Result(Outcomes outcome);
     event CanceledMatch();
@@ -108,7 +108,7 @@ contract RPSGame {
     }
 
     modifier isActive() {
-        require(status != GameStatus.Canceled);
+        require(status == GameStatus.Canceled);
         _;
     }
 
@@ -140,7 +140,7 @@ contract RPSGame {
 
     receive() external payable {}
 
-    function move(bytes32 _move) public isPlayer {
+    function move(bytes32 _move) public isPlayer isActive {
         if (!_timeoutValid()) {
             _cancelMatch();
             return;
@@ -156,7 +156,7 @@ contract RPSGame {
         currentTimeout = block.timestamp + afterPlayTimeout;
     }
 
-    function revealMove(string memory _move, bytes32 _moveCommit) public {
+    function revealMove(string memory _move, bytes32 _moveCommit) public isPlayer isActive {
         require(_moveCommit == keccak256(abi.encodePacked(_move)), "Move is not the committed one");
         if (payable(msg.sender) == player1) {
             require(player1EncodedMove == _moveCommit, "Commits are not equal");
