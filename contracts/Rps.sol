@@ -108,7 +108,7 @@ contract RPSGame {
     }
 
     modifier isActive() {
-        require(status == GameStatus.Active);
+        require(status == GameStatus.Active, "Game is no longer active");
         _;
     }
 
