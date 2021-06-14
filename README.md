@@ -70,3 +70,38 @@ and [SafeMath](https://docs.openzeppelin.com/contracts/4.x/utilities#api:math.ad
 ### Paying the players
 
 - We must `transfer` the winning player the bet amount
+
+## Demo
+
+- Create a Factory contract with player 1
+
+### Ownable Factory
+
+- Deactivate the factory with the `updateOpenForGames` function set to false
+- Try to create a game trying to `register`. It will not allow it
+- Change to player2 and try to `register`. It will not allow it.
+- As player2 try to `updateOpenForGames` to true. It will not allow it.
+- Back to player1, open the factory (`updateOpenForGames` to true)
+
+## Match Register
+
+- As player1 `register` a game with just one wei. It will allow it
+- As player2 try to `cancel` the game created by player one. The game key is the value passed to create it. It will not
+  allow it
+- As player1 try to `cancel` the game created by yourself. It will allow it
+- As player1 `register` a game with just one wei. It will allow it
+- As player 2 `register` a game one wei. It will create a new game. Look for the game address in the logs and connect to
+  it. Remember to select the factory contract and use the `toAddress` feature, not the `Deploy` button.
+
+## Match
+
+- As player 3 try to make a `move` in the new Match. It will not allow it.
+- As player 1 create a new `move`. Moves consist of a string that has first the Move ("r", "p", "s") and then your
+  password. You must encode this move using [keccack256](https://emn178.github.io/online-tools/keccak_256.html) and pass
+  it adding a "0x" at the beginning. Use "rMySecretPassword" as move.
+- As player 1 try to repeat the move. It will not allow it.
+- As player 1 try `revealMove` your move. Reveals consist of the decoded move string and the keccak of it. It will not
+  allow it.
+- As player 2 `move`, following the same steps than the player 1, but move "pMyOtherSecretPassword".
+- As player 1 try to `revealMove` your move. It will allow it.
+- As player 2 try to `revealMove` your move. It will allow it. This will output the result. It should be a player 2 win.
